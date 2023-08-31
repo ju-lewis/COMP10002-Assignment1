@@ -112,6 +112,7 @@ void zero_vars(longint_t vars[]);
 longint_t parse_num(char *rhs);
 int get_longint_length(char *num);
 
+int get_num_length(longint_t *var);
 void do_product(longint_t *var1, longint_t *var2);
 
 
@@ -386,7 +387,7 @@ parse_num(char *rhs) {
 			leading_zero_count++;
 		}
 		
-		parsed_num.digits[i] = parsed_digit;
+		parsed_num.digits[i] = (int)parsed_digit;
     }
 	parsed_num.length = rhs_len - leading_zero_count;
 	//printf("%d\n", parsed_num.length);
@@ -429,7 +430,7 @@ do_assign(longint_t *var1, longint_t *var2) {
 void
 do_plus(longint_t *var1, longint_t *var2) {
 
-    int i, var2_len = var2->length;
+    int i, var2_len = var2->length, carry_count = 0;
     
 
     /* Check for overflows before we modify the underlying values */
@@ -439,21 +440,23 @@ do_plus(longint_t *var1, longint_t *var2) {
     }
 
 	/* Iterate through each digit of var2's digits buffer */
-    for(i=0; i < var2_len; i++) {
-        //printf("Adding %d to %d\n", var2->digits[i], var1->digits[i]);
-        var1->digits[i] += var2->digits[i];
-    
+    for(i=0; i < var2_len+carry_count; i++) {
+        if(i < var2_len) {
+        	var1->digits[i] += (int)var2->digits[i];
+		}
+
         /* Handle digit carries */
-        if(var1->digits[i] >= 10) {
-
-            var1->digits[i] -= 10;
-            var1->digits[i+1] += 1;
-        }
+		if(var1->digits[i] >= 10) {
+			
+			carry_count++;
+			var1->digits[i+1]++;
+			var1->digits[i] -= INT_TEN;
+		}
     }
-
-
     /* Update the length of var1 if necessary */
-    var1->length = i + 1;
+	if(i > var1->length) {
+    	var1->length = i;
+	}
 }
 
 /*****************************************************************
@@ -465,6 +468,19 @@ prototypes at the top of the program.
 ******************************************************************
 *****************************************************************/
 
+int
+get_num_length(longint_t *var) {
+	int i;
+
+	/* Iterate through the array backwards*/
+	for(i=INTSIZE-1; i>=0; i--) {
+		printf("num[%d] = %d\n", i, var->digits[i]);
+		if(var->digits[i] != 0) {
+			//return i + 1;
+		}
+	}
+	return var->length;
+}
 
 void
 do_product(longint_t *var1, longint_t *var2) {
@@ -480,3 +496,8 @@ do_product(longint_t *var1, longint_t *var2) {
         }
 	}
 }
+
+
+/*
+Algorithms are fun!!!
+*/
