@@ -110,7 +110,9 @@ void do_assign(longint_t *var1, longint_t *var2);
 void do_plus(longint_t *var1, longint_t *var2);
 void zero_vars(longint_t vars[]);
 longint_t parse_num(char *rhs);
+int get_longint_length(char *num);
 
+void do_product(longint_t *var1, longint_t *var2);
 
 
 /****************************************************************/
@@ -363,19 +365,31 @@ of the existing ones, ok?
 */
 longint_t
 parse_num(char *rhs) {
-	int i, rhs_len = strlen(rhs);
-
+	int i, rhs_len = strlen(rhs), first_non_zero = 0, leading_zero_count = 0;;
+	int parsed_digit;
     longint_t parsed_num;
 
-    parsed_num.length = rhs_len;
+    
 
     /* Read number backwards into parsed_num digits buffer */
     for(i=0; i<rhs_len; i++) {
-        //printf("Reading %d to location %d\n", rhs[rhs_len - 1 - i] - CH_ZERO, i);
+        
         /* Offset characters by the code point of '0' */
-        parsed_num.digits[i] = rhs[rhs_len - 1 - i] - CH_ZERO;
+        
+		parsed_digit = rhs[rhs_len - 1 - i] - CH_ZERO;
+		/* Check if the digit being read in is non-zero */
+		if(rhs[i] != '0') {
+			first_non_zero = 1;
+		}
+		/* Overwrite leading zeros */
+		if(!first_non_zero) {
+			leading_zero_count++;
+		}
+		
+		parsed_num.digits[i] = parsed_digit;
     }
-
+	parsed_num.length = rhs_len - leading_zero_count;
+	//printf("%d\n", parsed_num.length);
     return parsed_num;
 }
 
@@ -439,7 +453,7 @@ do_plus(longint_t *var1, longint_t *var2) {
 
 
     /* Update the length of var1 if necessary */
-    var1->length = i;
+    var1->length = i + 1;
 }
 
 /*****************************************************************
@@ -452,3 +466,17 @@ prototypes at the top of the program.
 *****************************************************************/
 
 
+void
+do_product(longint_t *var1, longint_t *var2) {
+    int i, j, curr_product, var1_len = var1->length, var2_len = var2->length;
+
+    /* Iterate through all digits of the second number */
+    
+
+	for(i=0; i<var2_len; i++) {
+		for(j=0; j<var1_len; j++) {
+            /* Calculate the product of the current digit combination */
+            curr_product = var2->digits[i] * var1->digits[j];
+        }
+	}
+}
