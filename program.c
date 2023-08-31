@@ -455,7 +455,7 @@ do_plus(longint_t *var1, longint_t *var2) {
     }
     /* Update the length of var1 if necessary */
 	if(i > var1->length) {
-    	var1->length = i;
+    	var1->length = i - 1;
 	}
 }
 
