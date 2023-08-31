@@ -112,7 +112,7 @@ void zero_vars(longint_t vars[]);
 longint_t parse_num(char *rhs);
 int get_longint_length(char *num);
 
-int get_num_length(longint_t *var);
+int max_2_ints(int num1, int num2);
 void do_product(longint_t *var1, longint_t *var2);
 
 
@@ -430,7 +430,7 @@ do_assign(longint_t *var1, longint_t *var2) {
 void
 do_plus(longint_t *var1, longint_t *var2) {
 
-    int i, var2_len = var2->length, carry_count = 0;
+    int i, len_increase = 0, var1_len = var1->length, var2_len = var2->length, carry_count = 0;
     
 
     /* Check for overflows before we modify the underlying values */
@@ -453,10 +453,21 @@ do_plus(longint_t *var1, longint_t *var2) {
 			var1->digits[i] -= INT_TEN;
 		}
     }
-    /* Update the length of var1 if necessary */
-	if(i > var1->length) {
-    	var1->length = i - 1;
+
+    /* Update the length of var1 */
+	int longest_len = max_2_ints(var1_len, var2_len);
+
+	/* This was the most simple (and robust) way I could think of for determining the 
+	resulting number length without performing any iterations. */
+	if(var1_len != var2_len) {
+		var1->length = longest_len;
+
+	} else if (var1->digits[longest_len - 1] + var1->digits[longest_len - 1] >= 10) {
+		var1->length = longest_len + 1;
+	} else {
+		var1->length = longest_len;
 	}
+
 }
 
 /*****************************************************************
@@ -468,18 +479,11 @@ prototypes at the top of the program.
 ******************************************************************
 *****************************************************************/
 
+/* Return the largest of 2 input integers */
 int
-get_num_length(longint_t *var) {
-	int i;
-
-	/* Iterate through the array backwards*/
-	for(i=INTSIZE-1; i>=0; i--) {
-		printf("num[%d] = %d\n", i, var->digits[i]);
-		if(var->digits[i] != 0) {
-			//return i + 1;
-		}
-	}
-	return var->length;
+max_2_ints(int num1, int num2) {
+	int max_int = (num1 > num2) ?  num1 : num2;
+	return max_int;
 }
 
 void
