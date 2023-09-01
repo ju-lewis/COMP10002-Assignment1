@@ -270,8 +270,10 @@ process_line(longint_t vars[], char *line) {
 		do_assign(vars+varnum, &second_value);
 	} else if (optype == PLUS) {
 		do_plus(vars+varnum, &second_value);
-	// you will need to add further operators here
-	} else {
+
+	} else if (optype == MULT) {
+        do_product(vars+varnum, &second_value);
+    } else {
 		print_error("operation not available yet");
 		return;
 	}
@@ -432,48 +434,46 @@ void
 do_plus(longint_t *var1, longint_t *var2) {
 
     int i, len_increase = 0, var1_len = var1->length, 
-		var2_len = var2->length, carry_count = 0;
+		var2_len = var2->length, carry = 0;
 
     int longest_len = max_2_ints(var1_len, var2_len);
 
     /* Check for overflows before we modify the underlying values */
-    if(var1->digits[INTSIZE - 1] + var2->digits[INTSIZE - 1] >= 10) {
+    if(var1->digits[INTSIZE - 1] + var2->digits[INTSIZE - 1] >= INT_TEN) {
         fprintf(stderr, "longint_t overflow has occurred.\n");
         exit(EXIT_FAILURE);
     }
 
 	/* Iterate through all digits involved in the sum */
-    for(i=0; i < longest_len; i++) {
+    for(i=0; i < longest_len + carry; i++) {
 
 		/* If the current digit is in-bounds for both numbers, sum them 
 		and update corresponding var1 digit */
         if(i < var2_len && i < var1_len) {
-        	var1->digits[i] += (int)var2->digits[i];
+        	var1->digits[i] += var2->digits[i];
 		} else if (i >= var1_len) {
 			/* var1 is out of bounds, so just assign it the digit of var2 */
 			var1->digits[i] = var2->digits[i];
 		}
+        /* Add previous carry to the current digit and reset carry */
+        var1->digits[i] += carry;
+        carry = 0;
 
         /* Handle digit carries */
-		if(var1->digits[i] >= 10) {
+		if(var1->digits[i] >= INT_TEN) {
 			
-			carry_count++;
-			var1->digits[i+1]++;
+            /* Check if carry occurs in final digit */
+            if(i == longest_len - 1) {
+                len_increase = 1;
+            }
+			carry = 1;
 			var1->digits[i] -= INT_TEN;
 		}
 
     }
 
     /* Update the length of var1 */
-	if(var1_len != var2_len) {
-		var1->length = longest_len;
-
-	} else if (var1->digits[longest_len - 1] + var1->digits[longest_len - 1] >= 10) {
-		var1->length = longest_len + 1;
-	} else {
-		var1->length = longest_len;
-	}
-
+	var1->length = longest_len + len_increase;
 }
 
 /*****************************************************************
@@ -494,17 +494,43 @@ max_2_ints(int num1, int num2) {
 
 void
 do_product(longint_t *var1, longint_t *var2) {
-    int i, j, curr_product, var1_len = var1->length, var2_len = var2->length;
+    int i, j, curr_digit_product, var1_len = var1->length, 
+        var2_len = var2->length, carry = 0;
 
-    /* Iterate through all digits of the second number */
+    /* Initialise a longint_t to store current intermediate product */
+    longint_t curr_total_product, final_product;
+
     
 
+    /* Iterate through all digits of the second number */
 	for(i=0; i<var2_len; i++) {
-		for(j=0; j<var1_len; j++) {
+        /* Iterate through all digits of the first number */
+		for(j=0; j<var1_len + carry; j++) {
+
             /* Calculate the product of the current digit combination */
-            curr_product = var2->digits[i] * var1->digits[j];
+            curr_digit_product = var2->digits[i] * var1->digits[j];
+            /* Account for any previous digit carries */
+            curr_digit_product += carry;
+            carry = 0;
+
+            /* Check for current digit carries */
+            if(curr_digit_product >= INT_TEN) {
+                curr_total_product.digits[i] = curr_digit_product % INT_TEN;
+                carry = curr_digit_product / INT_TEN;
+            } else {
+                /* No carry necessary, assign digit regularly */
+                curr_total_product.digits[j] = curr_digit_product;
+            }
+            printf("Product digit [%d]  is  %d, carry?: %s\n", j, curr_total_product.digits[j], (carry ? "yes" : "no"));
+        }
+        /* Current intermediate product is complete, add to total product */
+        if(i == 0) {
+            do_plus(&final_product, &curr_total_product);
+        } else {
+            do_assign(&final_product, &curr_total_product);
         }
 	}
+    do_assign(var1, &final_product);
 }
 
 
