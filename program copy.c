@@ -505,7 +505,6 @@ max_2_ints(int num1, int num2) {
 	return max_int;
 }
 
-
 void
 print_register_info(longint_t *var1) {
 	int i = 0, var_len = var1->length;
@@ -516,14 +515,13 @@ print_register_info(longint_t *var1) {
 	printf("\n");
 }
 
-/* Shift a longint_t register over by `shift_width` digits and increment
+/* Shift a longint_t register over by 1 digit and increment
    the length by one. This is the same effect as multiplying by
-   a power of 10.
+   10.
 */
 void
 digit_shift(longint_t *var1, int shift_width) {
-	int i, var1_len = var1->length, 
-		starting_pos = (var1_len + shift_width - 1);
+	int i, var1_len = var1->length, starting_pos = (var1_len + shift_width - 1);
 
 	for(i=starting_pos; i>=0; i--) {
 		if(i-shift_width >= 0) {
@@ -539,12 +537,10 @@ digit_shift(longint_t *var1, int shift_width) {
 void
 do_product(longint_t *var1, longint_t *var2) {
     int i, j, curr_digit_product, var1_len = var1->length, 
-        var2_len = var2->length, carry_len = 0;
+        var2_len = var2->length, carry = 0;
 
     /* Initialise empty longint_t structs to store intermediate products */
     longint_t curr_total_product, final_product;
-
-	char int_str[3];
 
 	/* Initialise a zero longint_t */
 	longint_t zero;
@@ -556,26 +552,56 @@ do_product(longint_t *var1, longint_t *var2) {
 	do_assign(&curr_total_product, &zero);
 	do_assign(&final_product, &zero);
 
-	/* Always assign the longest number to the second digit */
-	if() {
-		
-	}
+	//print_register_info(&final_product);
+	//print_register_info(&curr_total_product);
 
-	/* Iterate through var2 (second number) */
-	for(i = 0; i < var2_len; i++) {
-		/* Iterate through var1 (first number) */
-		for(j = 0; j < var1_len; j++) {
-			/* Calculate product of corresponding base10 digits */
-			curr_digit_product = var1->digits[j] * var2->digits[i];
-			
-			/* Assign value to a longint_t */
-			sprintf(int_str, "%d", curr_digit_product);
-			curr_total_product = parse_num(int_str);
-		}
-		digit_shift(&curr_total_product, i);
-		do_plus(&final_product, &curr_total_product);
+	for(int k = 0; k < 3; k++) {
+		printf("%d",var1->digits[k]);
 	}
-	do_assign(var1, &final_product);
+	printf("\n");
+    /* Iterate through all digits of the second number */
+	for(i=0; i<var2_len; i++) {
+        /* Iterate through all digits of the first number */
+		for(j=0; j<var1_len + carry; j++) {
+			printf("Multiplying:   %dx%d ", var2->digits[i], var1->digits[j]);
+            /* Calculate the product of the current digit combination */
+            curr_digit_product = var2->digits[i] * var1->digits[j];
+            /* Account for any previous digit carries */
+            curr_digit_product += carry;
+            carry = 0;
+
+            /* Check for current digit carries */
+            if(curr_digit_product >= INT_TEN) {
+                curr_total_product.digits[j] = curr_digit_product % INT_TEN;
+				printf("assigning product digit: %d\n", curr_digit_product % INT_TEN);
+                carry = curr_digit_product / INT_TEN;
+            } else {
+                /* No carry necessary, assign digit regularly */
+                curr_total_product.digits[j] = curr_digit_product;
+				printf("assigning product digit: %d\n", curr_digit_product);
+            }
+            //printf("Product digit [%d]  is  %d, carry?: %s\n", j, curr_total_product.digits[j], (carry ? "yes" : "no"));
+        }
+		
+		curr_total_product.length = j;
+		//print_register_info(&curr_total_product);
+        /* Current intermediate product is complete, add to total product */
+        if(i == 0) {
+            do_assign(&final_product, &curr_total_product);
+			//printf("Initial assignment\n");
+        } else {
+			/* Shift the product over to the correct base 10 digit */
+			
+			digit_shift(&curr_total_product, i);
+			/* Add the intermediate product on to the final product */
+            do_plus(&final_product, &curr_total_product);
+			//printf("Sum\n");
+
+        }
+		//printf("%d\n", i);
+	}
+	/* Multiplication complete, assign value to var1 */
+    do_assign(var1, &final_product);
 }
 
 
