@@ -48,6 +48,7 @@
 #include <ctype.h>
 #include <assert.h>
 #include <unistd.h>
+#include <math.h>
 
 /* All necessary #defines provided as part of the initial skeleton */
 
@@ -121,6 +122,8 @@ int max_2_ints(int num1, int num2);
 void do_product(longint_t *var1, longint_t *var2);
 void print_register_info(longint_t *var1);
 void digit_shift(longint_t *var1, int shift_width);
+void do_exponent(longint_t *var1, longint_t *var2);
+int longint_to_integer(longint_t *var);
 
 
 /****************************************************************/
@@ -277,9 +280,10 @@ process_line(longint_t vars[], char *line) {
 		do_assign(vars+varnum, &second_value);
 	} else if (optype == PLUS) {
 		do_plus(vars+varnum, &second_value);
-
 	} else if (optype == MULT) {
         do_product(vars+varnum, &second_value);
+    } else if (optype == POWR) {
+        do_exponent(vars+varnum, &second_value);
     } else {
 		print_error("operation not available yet");
 		return;
@@ -409,9 +413,14 @@ parse_num(char *rhs) {
 */
 void
 do_print(int varnum, longint_t *var) {
+
 	printf("register %c: ", varnum+CH_A);
     int i;
     for(i=var->length-1; i>=0; i--) {
+        /* Print `,` every 3rd digit from the end */
+        if(i < var->length - 1 && (i + 1) % 3 == 0) {
+            printf(",");
+        }
         printf("%d", var->digits[i]);
     }
     printf("\n");
@@ -536,6 +545,9 @@ digit_shift(longint_t *var1, int shift_width) {
 	var1->length += shift_width;
 }
 
+/* Update the indicated variable var1 by doing a multiplication
+   using var2 to compute var1 = var1 * var2
+*/
 void
 do_product(longint_t *var1, longint_t *var2) {
     int i, j, curr_digit_product, var1_len = var1->length, 
@@ -556,11 +568,6 @@ do_product(longint_t *var1, longint_t *var2) {
 	do_assign(&curr_total_product, &zero);
 	do_assign(&final_product, &zero);
 
-	/* Always assign the longest number to the second digit */
-	if() {
-		
-	}
-
 	/* Iterate through var2 (second number) */
 	for(i = 0; i < var2_len; i++) {
 		/* Iterate through var1 (first number) */
@@ -571,13 +578,40 @@ do_product(longint_t *var1, longint_t *var2) {
 			/* Assign value to a longint_t */
 			sprintf(int_str, "%d", curr_digit_product);
 			curr_total_product = parse_num(int_str);
+
+            digit_shift(&curr_total_product, i + j);
+            do_plus(&final_product, &curr_total_product);
 		}
-		digit_shift(&curr_total_product, i);
-		do_plus(&final_product, &curr_total_product);
+		
 	}
 	do_assign(var1, &final_product);
 }
 
+/* Converts a longint_t variable to an integer and returns the result.
+   Note: this isn't intended to be used for longint arithmetic, only
+   for loop control for exponentiation.
+*/
+int
+longint_to_integer(longint_t *var) {
+    int i, curr_power, converted_int = 0, var_len = var->length;
+
+    for(i = 0; i < var_len; i++) {
+        converted_int += var->digits[i] * pow(10, i);
+    }
+
+    return converted_int;
+}
+
+void
+do_exponent(longint_t *var1, longint_t *var2) {
+    int i, exponent = longint_to_integer(var2);
+    longint_t result = *var1;
+
+    for(i=0; i < exponent - 1; i++) {
+        do_product(&result, var1);
+    }
+    *var1 = result;
+}
 
 /*
 Algorithms are fun!!!
