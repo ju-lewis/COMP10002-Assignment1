@@ -124,6 +124,9 @@ void print_register_info(longint_t *var1);
 void digit_shift(longint_t *var1, int shift_width);
 void do_exponent(longint_t *var1, longint_t *var2);
 int longint_to_integer(longint_t *var);
+void do_divide(longint_t *var1, longint_t *var2);
+int larger_num(longint_t *var1, longint_t *var2);
+void assign_subset(longint_t *subset, longint_t *var, int index, int length);
 
 
 /****************************************************************/
@@ -585,6 +588,7 @@ do_product(longint_t *var1, longint_t *var2) {
 
 	/* Iterate through var2 (second number) */
 	for(i = 0; i < var2_len; i++) {
+
 		/* Iterate through var1 (first number) */
 		for(j = 0; j < var1_len; j++) {
 			/* Calculate product of corresponding base10 digits */
@@ -610,7 +614,9 @@ int
 longint_to_integer(longint_t *var) {
     int i, converted_int = 0, var_len = var->length;
 
+	/* Iterate through each digit of `var` */
     for(i = 0; i < var_len; i++) {
+		/* Add digit to the integer output, accounting for position */
         converted_int += var->digits[i] * pow(10, i);
     }
 
@@ -625,10 +631,92 @@ do_exponent(longint_t *var1, longint_t *var2) {
     int i, exponent = longint_to_integer(var2);
     longint_t result = *var1;
 
+	if(exponent == 0) {
+		result.digits[0] = 1;
+		result.length = 1;
+	}
+
+	/* Iteratively perform multiplication of var1 to itself */
     for(i=0; i < exponent - 1; i++) {
         do_product(&result, var1);
     }
+
+	/* Finally assign result */
     *var1 = result;
+}
+
+/* Returns 1 if var1 is greater or equal to var2
+*/
+int
+larger_num(longint_t *var1, longint_t *var2) {
+
+	/* We immediately know the inequality based on a difference in lengths */
+	if(var1->length > var2->length) {
+		return 1;
+	} else if (var1->length < var2->length) {
+		return 0;
+	}
+
+	/* Define loop variable */
+	int i = var1->length - 1;
+
+	/* Loop to check character by character until a tiebreaker is found */
+	while(i >= 0) {
+		/* If any inequality is present, return value of inequality */
+		if(var1->digits[i] > var2->digits[i]) {
+			return 1;
+		} else if(var1->digits[i] < var2->digits[i]){
+			return 0;
+		}
+	} 
+	/* var1 is equal to var2, return 1 */
+	return 1;
+}
+
+/* Assign to a longint_t `subset` the value and length of a 'slice' or
+   subset of `var` described by its starting index and length.
+   Note: This function takes a subset slice in the regular order of a
+   number - from largest digit to smallest (aka in reverse for a longint_t)
+*/
+void
+assign_subset(longint_t *subset, longint_t *var, int index, int length) {
+	int i, j = 0;
+
+	subset->length = length;
+
+	/* Iterate through all elements of the subset slice */
+	while(i >= (index - length)) {
+
+		subset->digits[j] = var->digits[i];
+
+		j++;
+		i--;
+	}
+}
+
+/* Update the indicated variable var1 by doing an integer division
+   using var2 to compute var1 = var1 / var2
+*/
+void
+do_divide(longint_t *var1, longint_t *var2) {
+
+	int i, var1_len = var1->length, selection_width = 0;
+	longint_t result, curr_subset;
+
+	/* Assign initial value to the current subset */
+	assign_subset(&curr_subset, var1, var1_len-1, 1);
+
+	/* Loop through all digits in the first number */
+	for(i=var1_len-1; i>=0; i--) {
+
+		/* Check if var2 is greater than the current subset of var1 */
+
+		if(larger_num(var2, ))
+
+		/* Check if var2 is divisible by current subset of var1 */
+
+	}
+
 }
 
 /*

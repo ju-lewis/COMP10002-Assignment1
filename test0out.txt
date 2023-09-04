@@ -1,9 +1,0 @@
-> a=12345
-> a+23456
-> a?
-register a: 35,801
-> a+a
-> a?
-register a: 71,602
-> 
-ta daa!!!
