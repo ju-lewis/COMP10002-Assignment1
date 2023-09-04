@@ -98,8 +98,8 @@ typedef struct {
 
 /****************************************************************/
 
-/* A "magic" additional function needing explicit declaration */
-//int fileno(FILE *);
+/* A "magic" additional function needing explicit declaration 
+int fileno(FILE *); */
 
 /* Skeleton program function prototypes */
 
@@ -382,7 +382,6 @@ parse_num(char *rhs) {
 	int i, rhs_len = strlen(rhs), first_non_zero = 0, leading_zero_count = 0;;
 	int parsed_digit;
     longint_t parsed_num;
-
     
 
     /* Read number backwards into parsed_num digits buffer */
@@ -403,7 +402,11 @@ parse_num(char *rhs) {
 		parsed_num.digits[i] = (int)parsed_digit;
     }
 	parsed_num.length = rhs_len - leading_zero_count;
-	//printf("Read: %s, parsed to: %d\n", rhs, parsed_num.length);
+
+    if(parsed_num.length > INTSIZE) {
+        print_error("longint_t overflow has occurred.");
+    }
+
     return parsed_num;
 }
 
@@ -416,12 +419,17 @@ do_print(int varnum, longint_t *var) {
 
 	printf("register %c: ", varnum+CH_A);
     int i;
-    for(i=var->length-1; i>=0; i--) {
-        /* Print `,` every 3rd digit from the end */
-        if(i < var->length - 1 && (i + 1) % 3 == 0) {
-            printf(",");
+
+    if(var->length == 0) {
+        printf("0");
+    } else {
+        for(i=var->length-1; i>=0; i--) {
+            /* Print `,` every 3rd digit from the end */
+            if(i < var->length - 1 && (i + 1) % 3 == 0) {
+                printf(",");
+            }
+            printf("%d", var->digits[i]);
         }
-        printf("%d", var->digits[i]);
     }
     printf("\n");
 	
@@ -459,14 +467,14 @@ do_plus(longint_t *var1, longint_t *var2) {
 
     int longest_len = max_2_ints(var1_len, var2_len);
 
-    /* Check for overflows before we modify the underlying values */
-    if(var1->digits[INTSIZE - 1] + var2->digits[INTSIZE - 1] >= INT_TEN) {
-        print_error("longint_t overflow has occurred.");
-        exit(EXIT_FAILURE);
-    }
-
 	/* Iterate through all digits involved in the sum */
     for(i=0; i < longest_len + carry; i++) {
+
+        /* Check if the longint_t digits buffer is going to be overflowed  */
+        if(longest_len + 1 > INTSIZE) {
+            print_error("longint_t overflow has occurred.");
+            exit(EXIT_FAILURE);
+        }
 
 		/* If the current digit is in-bounds for both numbers, sum them 
 		and update corresponding var1 digit */
@@ -492,6 +500,11 @@ do_plus(longint_t *var1, longint_t *var2) {
 		}
 
     }
+    
+    /* Check if the longint_t digits buffer has been overflowed 
+    if (longest_len + len_increase > INTSIZE) {
+        print_error("longint_t overflow has occurred.");
+    } */
 
     /* Update the length of var1 */
 	var1->length = longest_len + len_increase;
@@ -514,7 +527,9 @@ max_2_ints(int num1, int num2) {
 	return max_int;
 }
 
-
+/* This is a debugging function for printing
+   the length and value of a longint_t register
+*/
 void
 print_register_info(longint_t *var1) {
 	int i = 0, var_len = var1->length;
@@ -527,7 +542,7 @@ print_register_info(longint_t *var1) {
 
 /* Shift a longint_t register over by `shift_width` digits and increment
    the length by one. This is the same effect as multiplying by
-   a power of 10.
+   a power of 10, where `shift_width` is the exponent.
 */
 void
 digit_shift(longint_t *var1, int shift_width) {
@@ -551,7 +566,7 @@ digit_shift(longint_t *var1, int shift_width) {
 void
 do_product(longint_t *var1, longint_t *var2) {
     int i, j, curr_digit_product, var1_len = var1->length, 
-        var2_len = var2->length, carry_len = 0;
+        var2_len = var2->length;
 
     /* Initialise empty longint_t structs to store intermediate products */
     longint_t curr_total_product, final_product;
@@ -593,7 +608,7 @@ do_product(longint_t *var1, longint_t *var2) {
 */
 int
 longint_to_integer(longint_t *var) {
-    int i, curr_power, converted_int = 0, var_len = var->length;
+    int i, converted_int = 0, var_len = var->length;
 
     for(i = 0; i < var_len; i++) {
         converted_int += var->digits[i] * pow(10, i);
@@ -602,6 +617,9 @@ longint_to_integer(longint_t *var) {
     return converted_int;
 }
 
+/* Update the indicated variable var1 by raising var1 to the power
+   of var2, var1 = var1 ^ var2
+*/
 void
 do_exponent(longint_t *var1, longint_t *var2) {
     int i, exponent = longint_to_integer(var2);
