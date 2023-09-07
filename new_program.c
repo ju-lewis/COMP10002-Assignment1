@@ -80,6 +80,7 @@
 #define INT_TEN  10	/* integer 10 */
 
 #define MAX_DIGIT_PRODUCT_LEN 3
+#define MAX_EXPONENT 1660 /* Any exponent greater than this will overflow */
 
 /* Crude fileno fix to allow compilation on Windows */
 #define FILENO_STDIN 0
@@ -504,7 +505,7 @@ do_plus(longint_t *var1, longint_t *var2) {
     sum.length = i + digit_sum / INT_TEN;
 
     /* Check for overflows before final assignment */
-    if(sum.length >= INTSIZE) {
+    if(sum.length > INTSIZE) {
         print_error("longint_t overflow has occurred. Terminating program.");
         exit(EXIT_FAILURE);
     }
@@ -630,15 +631,19 @@ void
 do_exponent(longint_t *var1, longint_t *var2) {
     int i, exponent = longint_to_integer(var2);
     longint_t result = *var1;
-
     /* EDGE CASE HANDLING */
-	if(exponent == 0) {
-		result.digits[0] = 1;
-		result.length = 1;
-	}
     if(var1->digits[var1->length - 1] <= 1) {
-        /* Exponential base is 0 or 1 */
+        /* Exponential base is 0 or 1, don't modify vakyes */
         return;
+    }
+	if(exponent == 0) {
+		var1->digits[0] = 1;
+		var1->length = 1;
+        return;
+	}
+    if (exponent > MAX_EXPONENT) {
+        print_error("longint_t overflow has occurred. Terminating program.");
+        exit(EXIT_FAILURE);
     }
     /* END EDGE CASE HANDLING */
 
@@ -646,7 +651,7 @@ do_exponent(longint_t *var1, longint_t *var2) {
     for(i=0; i < exponent - 1; i++) {
         do_product(&result, var1);
     }
-
+    
 	/* Finally assign result */
     *var1 = result;
 }
@@ -686,22 +691,20 @@ larger_num(longint_t *var1, longint_t *var2) {
 
 /* Assign to a longint_t `subset` the value and length of a 'slice' or
    subset of `var` described by its starting index and length.
-   Note: This function takes a subset slice in the regular order of a
-   number - from largest digit to smallest (aka in reverse for a longint_t)
 */
 void
 assign_subset(longint_t *subset, longint_t *var, int index, int length) {
-	int i = index, j = length - 1;
+	int i = index, j = 0;
 
 	subset->length = length;
 
 	/* Iterate through all elements of the subset slice */
-	while(i > (index - length)) {
+	while(i < (index + length)) {
 
 		subset->digits[j] = var->digits[i];
 
-		j--;
-		i--;
+		j++;
+		i++;
 	}
 }
 
@@ -758,42 +761,31 @@ do_minus(longint_t *var1, longint_t *var2) {
     return 1;
 }
 
-/* Returns an integer that is the result of the integer division `subset` / `var`
-   where `subset` is a subset or 'slice' of a larger longint_t.
+/* Returns an integer that is the result of the integer division 
+   `subset` / `var` where `subset` is a slice of a larger longint_t.
 */
 int
 small_division(longint_t *subset, longint_t *var, int *remainder) {
-	int i, number_comparison, result = 0;
-	longint_t curr_quotient, zero;
+	int i, is_negative, result = 0;
+	longint_t curr_quotient;
 
-    zero.length = 1;
-    for(i=0; i<INTSIZE; i++) {
-        zero.digits[i] = 0;
-    }
-
+    
+    
 	curr_quotient = *subset;
-    printf("Initial value: ");
-    print_register_info(&curr_quotient);
+    /* Apply previous remainder to the current quotient */
+    curr_quotient.digits[subset->length] = *remainder;
 
 	/* Loop while the quotient is greater than 0 */
-	while(do_minus(&curr_quotient, var) > 0) {
-        printf("During loop: ");
-        print_register_info(&curr_quotient);
+	while((is_negative = do_minus(&curr_quotient, var)) > 0) {
 		result++;
 	}
-    printf("Final: ");
-    print_register_info(&curr_quotient);
-    /* Calculate remainder 
-	if(larger_num(&curr_quotient, &zero) > 0) {
-        *remainder 
-    } else if(larger_num(&curr_quotient, &zero) < 0) {
-
+    /* Calculate remainder */
+    if(is_negative < 0) {
+        *remainder = longint_to_integer(&curr_quotient);
     } else {
         *remainder = 0;
-    }*/
-
+    }
 	return result;
-
 }
 
 /* Update the indicated variable var1 by doing an integer division
@@ -802,43 +794,50 @@ small_division(longint_t *subset, longint_t *var, int *remainder) {
 void
 do_divide(longint_t *var1, longint_t *var2) {
 
-	int i, j, remainder, curr_quotient, var1_len = var1->length, selection_width = 1;
+	int i, j, curr_quotient, remainder = 0, first_non_zero = 0,
+    var1_len = var1->length, selection_width = 1;
     int initial_result[INTSIZE];
 	longint_t result, curr_subset;
-
-	/* Assign initial value to the current subset */
-	//printf("%d\n", small_division(var1, var2, &remainder));
-    remainder = do_minus(var1, var2);
-    printf("Result: ");
-    print_register_info(var1);
-    printf("Negative?: %s\n", remainder > 0 ? "No" : "Yes");
-    return;
-	//printf("Division result %d\n", small_division(var1, var2));
+    /* Handle edge cases */
+    if(var2->digits[var2->length - 1] == 0) {
+        print_error("Division by 0 error!\n");
+        exit(EXIT_FAILURE);
+    }
     j = 0;
 	/* Loop through all digits in the first number */
 	for(i=var1_len-1; i>=0; i--) {
-
-        assign_subset(&curr_subset, var1, var1_len-1, selection_width);
-
+        assign_subset(&curr_subset, var1, i, selection_width);
 		/* Check if the current subset of var1 is greater than var2*/
-		if(larger_num(&curr_subset, var2)) {
+		if(larger_num(&curr_subset, var2) >= 0) {
 			/* This means the current subset is divisible by var2*/
             curr_quotient = small_division(&curr_subset, var2, &remainder);
-            printf("The quotient is: %d\n", curr_quotient);
-            selection_width = 0;
-            
+            /* Write quotient to result in correct location */
+            initial_result[j] = curr_quotient;
+
+            selection_width = 1;
+            first_non_zero = 1;
 
 		} else {
 			/* var2 is NOT divisible by the current subset of var1, add 0 to
 			result and increase subset length by 1 */
             initial_result[j] = 0;
-            selection_width++;
+            /* Only increment selection length if the selection isn't 0 */
+            if(!(curr_subset.length == 1 && curr_subset.digits[0] == 0)) {
+                selection_width++;
+            }
 		}
-
-		
-
+        /* Don't write preceding zeros to the result */
+        if(first_non_zero) {
+            j++;
+        }
 	}
-
+    result.length = j;
+    /* Now we need to reverse the `initial_result` 
+       and write to longint_t `result` */
+    for(i=0; i<j; i++) {
+        result.digits[result.length - i - 1] = initial_result[i];
+    }
+    do_assign(var1, &result);
 }
 
 /*
