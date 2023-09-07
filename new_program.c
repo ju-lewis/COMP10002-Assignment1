@@ -115,7 +115,6 @@ void do_assign(longint_t *var1, longint_t *var2);
 void do_plus(longint_t *var1, longint_t *var2);
 void zero_vars(longint_t vars[]);
 longint_t parse_num(char *rhs);
-int get_longint_length(char *num);
 
 int max_2_ints(int num1, int num2);
 void do_product(longint_t *var1, longint_t *var2);
@@ -126,7 +125,8 @@ int longint_to_integer(longint_t *var);
 void do_divide(longint_t *var1, longint_t *var2);
 int larger_num(longint_t *var1, longint_t *var2);
 void assign_subset(longint_t *subset, longint_t *var, int index, int length);
-int small_division(longint_t *subset, longint_t *var);
+int small_division(longint_t *subset, longint_t *var, int *remainder);
+int do_minus(longint_t *var1, longint_t *var2);
 
 
 /****************************************************************/
@@ -466,62 +466,51 @@ do_assign(longint_t *var1, longint_t *var2) {
 void
 do_plus(longint_t *var1, longint_t *var2) {
 
-	/*printf("\n\nAddition:\n");
-	print_register_info(var1);
-	print_register_info(var2);*/
-	
+	int i, digit_sum, digit1, digit2, 
+        var1_len = var1->length, var2_len = var2->length;
 
-    int i, len_increase = 0, var1_len = var1->length, 
-		var2_len = var2->length, carry = 0;
 
-    int longest_len = max_2_ints(var1_len, var2_len);
+    /* Initialise a sum variable to longint_t zero */
+    longint_t sum;
+    sum.length = 1;
+    for(i=0; i<INTSIZE; i++) {
+        sum.digits[i] = 0;
+    }
 
-	/* Iterate through all digits involved in the sum */
-    for(i=0; i < longest_len + carry; i++) {
-
-        /* Check if the longint_t digits buffer is going to be overflowed  */
-        if(longest_len + 1 > INTSIZE) {
-            print_error("longint_t overflow has occurred.");
-            exit(EXIT_FAILURE);
+    i = 0;
+    /* Loop while in bounds of the var1 and var2 */
+    while(i < INTSIZE && (i < var1_len || i < var2_len)) {
+        
+        /* Do longint_t bounds detection */
+        digit1 = var1->digits[i];
+        digit2 = var2->digits[i];
+        if(i >= var1_len) {
+            digit1 = 0;
+        }
+        if(i >= var2_len) {
+            digit2 = 0;
         }
 
-		/* If the current digit is in-bounds for both numbers, sum them 
-		and update corresponding var1 digit */
-        if((i < var2_len && i < var1_len) || 1) {
-        	var1->digits[i] += var2->digits[i];
-		} else if (i >= var1_len) {
-			/* var1 is out of bounds, so just assign it the digit of var2 */
-			var1->digits[i] = var2->digits[i];
-		}
-        /* Add previous carry to the current digit and reset carry */
-        var1->digits[i] += carry;
+        /* Add the corresponding digits */
+        digit_sum = digit1 + digit2;
+        //printf("sum of %d+%d = %d\n", digit1, digit2, digit_sum);
 
-		//printf("\nCurrent digit sum: %d\n", var1->digits[i]);
+        sum.digits[i] += digit_sum % INT_TEN;
+        sum.digits[i+1] += digit_sum / INT_TEN;
+        
 
-        carry = 0;
-
-        /* Handle digit carries */
-		if(var1->digits[i] >= INT_TEN) {
-			
-            /* Check if carry occurs in final digit */
-            if(i == longest_len - 1) {
-                len_increase = 1;
-            }
-			carry = 1;
-			var1->digits[i] -= INT_TEN;
-		}
-
+        i++;
     }
-    
-    /* Check if the longint_t digits buffer has been overflowed 
-    if (longest_len + len_increase > INTSIZE) {
-        print_error("longint_t overflow has occurred.");
-    } */
+    sum.length = i + digit_sum / INT_TEN;
 
-    /* Update the length of var1 */
-	var1->length = longest_len + len_increase;
-	//print_register_info(var1);
-	//printf("End addition\n\n");
+    /* Check for overflows before final assignment */
+    if(sum.length >= INTSIZE) {
+        print_error("longint_t overflow has occurred. Terminating program.");
+        exit(EXIT_FAILURE);
+    }
+
+    do_assign(var1, &sum);
+
 }
 
 /*****************************************************************
@@ -716,34 +705,92 @@ assign_subset(longint_t *subset, longint_t *var, int index, int length) {
 	}
 }
 
+/* Assign to `var1` the result var1 = var1 - var2, returns -1 if
+   the result is negative (does not modify var1 or var2 in this case)
+*/
+int
+do_minus(longint_t *var1, longint_t *var2) {
+
+	int i, digit_diff, carry = 0, var1_len = var1->length, 
+    var2_len = var2->length, leading_zero_count = 0;
+    longint_t difference;
+    
+    /* Check if the result is going to be negative */
+    if(var2_len > var1_len) {
+        return -1;
+    } else if (var2_len == var1_len && 
+        var2->digits[var2_len - 1] > var1->digits[var1_len - 1]) {
+        return -1;
+    }
+
+    i = 0;
+    /* Loop while in bounds of the var1 and var2 */
+    while(i < INTSIZE && (i < var1_len || i < var2_len)) {
+    
+        /* Do initial subtraction */
+        if(i < var2_len) {
+            digit_diff = var1->digits[i] - var2->digits[i] - carry;
+        } else {
+            digit_diff = var1->digits[i] - carry;
+        }
+        
+        if(digit_diff < 0) {
+
+            /* Handle necessary 'borrows' from next digit */
+            digit_diff += 10;
+            carry = 1;
+        } else {
+            carry = 0;
+        }
+        difference.digits[i] = digit_diff;
+        
+        /* Increment `leading_zero_count if the current digit is zero, 
+        resetting if non_zero is found */
+        if(digit_diff == 0) {
+            leading_zero_count++;
+        } else {
+            leading_zero_count = 0;
+        }
+        i++;
+    }
+    difference.length = i - leading_zero_count;
+    do_assign(var1, &difference);
+    return 1;
+}
+
 /* Returns an integer that is the result of the integer division `subset` / `var`
    where `subset` is a subset or 'slice' of a larger longint_t.
 */
 int
-small_division(longint_t *subset, longint_t *var) {
+small_division(longint_t *subset, longint_t *var, int *remainder) {
 	int i, number_comparison, result = 0;
-	longint_t curr_product;
+	longint_t curr_quotient, zero;
 
-	/* Initialise the current product to 0 */
+    zero.length = 1;
     for(i=0; i<INTSIZE; i++) {
-        curr_product.digits[i] = 0;
+        zero.digits[i] = 0;
     }
-    curr_product.length = 1;
 
-	/* Loop while the current product of var is less than the subset */
-	while((number_comparison = larger_num(&curr_product, subset)) < 0) {
-		printf("\n\nCurrent product: ");
-		print_register_info(&curr_product);
-		printf("Current division: %d\n\n", result);
-		/* Add `var` to `curr_product` and increment the result */
-		do_plus(&curr_product, var);
-		
+	curr_quotient = *subset;
+    printf("Initial value: ");
+    print_register_info(&curr_quotient);
+
+	/* Loop while the quotient is greater than 0 */
+	while(do_minus(&curr_quotient, var) > 0) {
+        printf("During loop: ");
+        print_register_info(&curr_quotient);
 		result++;
 	}
+    printf("Final: ");
+    print_register_info(&curr_quotient);
+    /* Calculate remainder 
+	if(larger_num(&curr_quotient, &zero) > 0) {
+        *remainder 
+    } else if(larger_num(&curr_quotient, &zero) < 0) {
 
-	if(number_comparison > 0) {
-		result--;
-	}
+    } else {
+        *remainder = 0;
+    }*/
 
 	return result;
 
@@ -755,30 +802,42 @@ small_division(longint_t *subset, longint_t *var) {
 void
 do_divide(longint_t *var1, longint_t *var2) {
 
-	int i, var1_len = var1->length, selection_width = 0;
+	int i, j, remainder, curr_quotient, var1_len = var1->length, selection_width = 1;
+    int initial_result[INTSIZE];
 	longint_t result, curr_subset;
 
 	/* Assign initial value to the current subset */
-	assign_subset(&curr_subset, var1, var1_len-1, 2);
-
-	printf("Division result %d\n", small_division(var1, var2));
-
+	//printf("%d\n", small_division(var1, var2, &remainder));
+    remainder = do_minus(var1, var2);
+    printf("Result: ");
+    print_register_info(var1);
+    printf("Negative?: %s\n", remainder > 0 ? "No" : "Yes");
+    return;
+	//printf("Division result %d\n", small_division(var1, var2));
+    j = 0;
 	/* Loop through all digits in the first number */
-	//for(i=var1_len-1; i>=0; i--) {
+	for(i=var1_len-1; i>=0; i--) {
+
+        assign_subset(&curr_subset, var1, var1_len-1, selection_width);
 
 		/* Check if the current subset of var1 is greater than var2*/
-		//if(larger_num(&curr_subset, var2)) {
+		if(larger_num(&curr_subset, var2)) {
 			/* This means the current subset is divisible by var2*/
+            curr_quotient = small_division(&curr_subset, var2, &remainder);
+            printf("The quotient is: %d\n", curr_quotient);
+            selection_width = 0;
+            
 
-		//} else {
+		} else {
 			/* var2 is NOT divisible by the current subset of var1, add 0 to
 			result and increase subset length by 1 */
-
-		//}
+            initial_result[j] = 0;
+            selection_width++;
+		}
 
 		
 
-	//}
+	}
 
 }
 
