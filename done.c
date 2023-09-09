@@ -48,6 +48,7 @@
 #include <ctype.h>
 #include <assert.h>
 #include <unistd.h>
+#include <math.h>
 
 /* All necessary #defines provided as part of the initial skeleton */
 
@@ -78,13 +79,13 @@
 #define INT_ZERO 0	/* integer 0 */
 #define INT_TEN  10	/* integer 10 */
 
+#define MAX_DIGIT_PRODUCT_LEN 3
+#define MAX_EXPONENT 1660 /* Any exponent greater than this will overflow */
+
 /* Crude fileno fix to allow compilation on Windows */
 #define FILENO_STDIN 0
 #define FILENO_STDOUT 1 
 
-
-/* Placeholder typedef for skeleton code
-*/
 
 typedef struct {
     int length;
@@ -97,8 +98,8 @@ typedef struct {
 
 /****************************************************************/
 
-/* A "magic" additional function needing explicit declaration */
-//int fileno(FILE *);
+/* A "magic" additional function needing explicit declaration 
+int fileno(FILE *); */
 
 /* Skeleton program function prototypes */
 
@@ -115,12 +116,19 @@ void do_assign(longint_t *var1, longint_t *var2);
 void do_plus(longint_t *var1, longint_t *var2);
 void zero_vars(longint_t vars[]);
 longint_t parse_num(char *rhs);
-int get_longint_length(char *num);
 
 int max_2_ints(int num1, int num2);
 void do_product(longint_t *var1, longint_t *var2);
 void print_register_info(longint_t *var1);
 void digit_shift(longint_t *var1, int shift_width);
+void do_exponent(longint_t *var1, longint_t *var2);
+int longint_to_integer(longint_t *var);
+int larger_num(longint_t *var1, longint_t *var2);
+int do_minus(longint_t *var1, longint_t *var2);
+int small_divide(longint_t *subset, longint_t *divisor, longint_t *remainder);
+void do_divide(longint_t *var1, longint_t *var2);
+
+
 
 
 /****************************************************************/
@@ -277,10 +285,13 @@ process_line(longint_t vars[], char *line) {
 		do_assign(vars+varnum, &second_value);
 	} else if (optype == PLUS) {
 		do_plus(vars+varnum, &second_value);
-
 	} else if (optype == MULT) {
         do_product(vars+varnum, &second_value);
-    } else {
+    } else if (optype == POWR) {
+        do_exponent(vars+varnum, &second_value);
+    } else if (optype == DIVS) {
+		do_divide(vars+varnum, &second_value);
+	} else {
 		print_error("operation not available yet");
 		return;
 	}
@@ -348,7 +359,7 @@ zero_vars(longint_t vars[]) {
     for(i=0; i<INTSIZE; i++) {
         zero.digits[i] = 0;
     }
-    zero.length = 0;
+    zero.length = 1;
 
     /* Iterate and assign all registers to longint_t zero */
 	for (i=0; i<NVARS; i++) {
@@ -378,7 +389,6 @@ parse_num(char *rhs) {
 	int i, rhs_len = strlen(rhs), first_non_zero = 0, leading_zero_count = 0;;
 	int parsed_digit;
     longint_t parsed_num;
-
     
 
     /* Read number backwards into parsed_num digits buffer */
@@ -398,8 +408,18 @@ parse_num(char *rhs) {
 		
 		parsed_num.digits[i] = (int)parsed_digit;
     }
+
 	parsed_num.length = rhs_len - leading_zero_count;
-	//printf("Read: %s, parsed to: %d\n", rhs, parsed_num.length);
+
+    if(!first_non_zero) {
+        parsed_num.digits[0] = 0;
+        parsed_num.length = 1;
+    }
+
+    if(parsed_num.length > INTSIZE) {
+        print_error("longint_t overflow has occurred.");
+    }
+
     return parsed_num;
 }
 
@@ -409,11 +429,19 @@ parse_num(char *rhs) {
 */
 void
 do_print(int varnum, longint_t *var) {
+
 	printf("register %c: ", varnum+CH_A);
     int i;
+
+    
     for(i=var->length-1; i>=0; i--) {
+        /* Print `,` every 3rd digit from the end */
+        if(i < var->length - 1 && (i + 1) % 3 == 0) {
+            printf(",");
+        }
         printf("%d", var->digits[i]);
     }
+    
     printf("\n");
 	
 }
@@ -440,52 +468,46 @@ do_assign(longint_t *var1, longint_t *var2) {
 void
 do_plus(longint_t *var1, longint_t *var2) {
 
-	/*printf("\n\nAddition:\n");
-	print_register_info(var1);
-	print_register_info(var2);
-	printf("End addition\n\n");*/
+	int i, digit_sum, digit1, digit2, 
+        var1_len = var1->length, var2_len = var2->length;
 
-    int i, len_increase = 0, var1_len = var1->length, 
-		var2_len = var2->length, carry = 0;
 
-    int longest_len = max_2_ints(var1_len, var2_len);
+    /* Initialise a sum variable to longint_t zero */
+    longint_t sum;
+    sum.length = 1;
+    for(i=0; i<INTSIZE; i++) {
+        sum.digits[i] = 0;
+    }
 
-    /* Check for overflows before we modify the underlying values */
-    if(var1->digits[INTSIZE - 1] + var2->digits[INTSIZE - 1] >= INT_TEN) {
-        print_error("longint_t overflow has occurred.");
+    i = 0;
+    /* Loop while in bounds of the var1 and var2 */
+    while(i < INTSIZE && (i < var1_len || i < var2_len)) {
+        
+        /* Do longint_t bounds detection */
+        digit1 = var1->digits[i];
+        digit2 = var2->digits[i];
+        if(i >= var1_len) {
+            digit1 = 0;
+        }
+        if(i >= var2_len) {
+            digit2 = 0;
+        }
+        /* Add the corresponding digits */
+        digit_sum = digit1 + digit2 + sum.digits[i];
+        sum.digits[i] = digit_sum % INT_TEN;
+        sum.digits[i+1] = digit_sum / INT_TEN;
+        i++;
+    }
+    sum.length = i + digit_sum / INT_TEN;
+
+    /* Check for overflows before final assignment */
+    if(sum.length > INTSIZE) {
+        print_error("longint_t overflow has occurred. Terminating program.");
         exit(EXIT_FAILURE);
     }
 
-	/* Iterate through all digits involved in the sum */
-    for(i=0; i < longest_len + carry; i++) {
+    do_assign(var1, &sum);
 
-		/* If the current digit is in-bounds for both numbers, sum them 
-		and update corresponding var1 digit */
-        if(i < var2_len && i < var1_len) {
-        	var1->digits[i] += var2->digits[i];
-		} else if (i >= var1_len) {
-			/* var1 is out of bounds, so just assign it the digit of var2 */
-			var1->digits[i] = var2->digits[i];
-		}
-        /* Add previous carry to the current digit and reset carry */
-        var1->digits[i] += carry;
-        carry = 0;
-
-        /* Handle digit carries */
-		if(var1->digits[i] >= INT_TEN) {
-			
-            /* Check if carry occurs in final digit */
-            if(i == longest_len - 1) {
-                len_increase = 1;
-            }
-			carry = 1;
-			var1->digits[i] -= INT_TEN;
-		}
-
-    }
-
-    /* Update the length of var1 */
-	var1->length = longest_len + len_increase;
 }
 
 /*****************************************************************
@@ -505,6 +527,9 @@ max_2_ints(int num1, int num2) {
 	return max_int;
 }
 
+/* This is a debugging function for printing
+   the length and value of a longint_t register
+*/
 void
 print_register_info(longint_t *var1) {
 	int i = 0, var_len = var1->length;
@@ -515,13 +540,14 @@ print_register_info(longint_t *var1) {
 	printf("\n");
 }
 
-/* Shift a longint_t register over by 1 digit and increment
+/* Shift a longint_t register over by `shift_width` digits and increment
    the length by one. This is the same effect as multiplying by
-   10.
+   a power of 10, where `shift_width` is the exponent.
 */
 void
 digit_shift(longint_t *var1, int shift_width) {
-	int i, var1_len = var1->length, starting_pos = (var1_len + shift_width - 1);
+	int i, var1_len = var1->length, 
+		starting_pos = (var1_len + shift_width - 1);
 
 	for(i=starting_pos; i>=0; i--) {
 		if(i-shift_width >= 0) {
@@ -534,76 +560,244 @@ digit_shift(longint_t *var1, int shift_width) {
 	var1->length += shift_width;
 }
 
+/* Update the indicated variable var1 by doing a multiplication
+   using var2 to compute var1 = var1 * var2
+*/
 void
 do_product(longint_t *var1, longint_t *var2) {
     int i, j, curr_digit_product, var1_len = var1->length, 
-        var2_len = var2->length, carry = 0;
+        var2_len = var2->length;
 
     /* Initialise empty longint_t structs to store intermediate products */
     longint_t curr_total_product, final_product;
+
+	char int_str[MAX_DIGIT_PRODUCT_LEN];
 
 	/* Initialise a zero longint_t */
 	longint_t zero;
     for(i=0; i<INTSIZE; i++) {
         zero.digits[i] = 0;
     }
-    zero.length = 0;
+    zero.length = 1;
 
 	do_assign(&curr_total_product, &zero);
 	do_assign(&final_product, &zero);
 
-	//print_register_info(&final_product);
-	//print_register_info(&curr_total_product);
+	/* Iterate through var2 (second number) */
+	for(i = 0; i < var2_len; i++) {
 
-	for(int k = 0; k < 3; k++) {
-		printf("%d",var1->digits[k]);
-	}
-	printf("\n");
-    /* Iterate through all digits of the second number */
-	for(i=0; i<var2_len; i++) {
-        /* Iterate through all digits of the first number */
-		for(j=0; j<var1_len + carry; j++) {
-			printf("Multiplying:   %dx%d ", var2->digits[i], var1->digits[j]);
-            /* Calculate the product of the current digit combination */
-            curr_digit_product = var2->digits[i] * var1->digits[j];
-            /* Account for any previous digit carries */
-            curr_digit_product += carry;
-            carry = 0;
-
-            /* Check for current digit carries */
-            if(curr_digit_product >= INT_TEN) {
-                curr_total_product.digits[j] = curr_digit_product % INT_TEN;
-				printf("assigning product digit: %d\n", curr_digit_product % INT_TEN);
-                carry = curr_digit_product / INT_TEN;
-            } else {
-                /* No carry necessary, assign digit regularly */
-                curr_total_product.digits[j] = curr_digit_product;
-				printf("assigning product digit: %d\n", curr_digit_product);
-            }
-            //printf("Product digit [%d]  is  %d, carry?: %s\n", j, curr_total_product.digits[j], (carry ? "yes" : "no"));
-        }
-		
-		curr_total_product.length = j;
-		//print_register_info(&curr_total_product);
-        /* Current intermediate product is complete, add to total product */
-        if(i == 0) {
-            do_assign(&final_product, &curr_total_product);
-			//printf("Initial assignment\n");
-        } else {
-			/* Shift the product over to the correct base 10 digit */
+		/* Iterate through var1 (first number) */
+		for(j = 0; j < var1_len; j++) {
+			/* Calculate product of corresponding base10 digits */
+			curr_digit_product = var1->digits[j] * var2->digits[i];
 			
-			digit_shift(&curr_total_product, i);
-			/* Add the intermediate product on to the final product */
+			/* Assign value to a longint_t, accounting for digit position */
+			sprintf(int_str, "%d", curr_digit_product);
+			curr_total_product = parse_num(int_str);
+            digit_shift(&curr_total_product, i + j);
             do_plus(&final_product, &curr_total_product);
-			//printf("Sum\n");
-
-        }
-		//printf("%d\n", i);
+		}
 	}
-	/* Multiplication complete, assign value to var1 */
-    do_assign(var1, &final_product);
+	do_assign(var1, &final_product);
 }
 
+/* Converts a longint_t variable to an integer and returns the result.
+   Note: this isn't intended to be used for longint arithmetic, only
+   for loop control for exponentiation.
+*/
+int
+longint_to_integer(longint_t *var) {
+    int i, converted_int = 0, var_len = var->length;
+	/* Iterate through each digit of `var` */
+    for(i = 0; i < var_len; i++) {
+		/* Add digit to the integer output, accounting for position */
+        converted_int += var->digits[i] * pow(10, i);
+    }
+    return converted_int;
+}
+
+/* Update the indicated variable var1 by raising var1 to the power
+   of var2, var1 = var1 ^ var2
+*/
+void
+do_exponent(longint_t *var1, longint_t *var2) {
+    int i, exponent = longint_to_integer(var2);
+    longint_t result = *var1;
+    /* EDGE CASE HANDLING */
+    if(var1->digits[var1->length - 1] <= 1) {
+        /* Exponential base is 0 or 1, don't modify vakyes */
+        return;
+    }
+	if(exponent == 0) {
+		var1->digits[0] = 1;
+		var1->length = 1;
+        return;
+	}
+    if (exponent > MAX_EXPONENT) {
+        print_error("longint_t overflow has occurred.");
+        exit(EXIT_FAILURE);
+    }
+    /* END EDGE CASE HANDLING */
+
+	/* Iteratively perform multiplication of var1 to itself */
+    for(i=0; i < exponent - 1; i++) {
+        do_product(&result, var1);
+    }
+    
+	/* Finally assign result */
+    *var1 = result;
+}
+
+/* Returns 1 if `var1` is greater than `var2`, 0 if `var1` is equal to `var2`
+   and -1 if `var1` is less than `var2`
+*/
+int
+larger_num(longint_t *var1, longint_t *var2) {
+	/* We immediately know the inequality based on a difference in lengths */
+	if(var1->length > var2->length) {
+		return 1;
+	} else if (var1->length < var2->length) {
+		return -1;
+	}
+	/* Define loop variable */
+	int i = var1->length - 1;
+	/* Loop to check character by character until a tiebreaker is found */
+	while(i >= 0) {
+		/* If any inequality is present, return value of inequality */
+		if(var1->digits[i] > var2->digits[i]) {
+			return 1;
+		} else if(var1->digits[i] < var2->digits[i]){
+			return -1;
+		}
+		i--;
+	} 
+	/* var1 is equal to var2, return 0 */
+	return 0;
+}
+
+
+/* Assign to `var1` the result var1 = var1 - var2, returns -1 if
+   the result is negative (does not modify var1 or var2 in this case)
+*/
+int
+do_minus(longint_t *var1, longint_t *var2) {
+
+	int i, digit_diff, carry = 0, var1_len = var1->length, 
+    var2_len = var2->length, leading_zero_count = 0;
+    longint_t difference;
+    
+    /* Check if the result is going to be negative */
+    if(larger_num(var1, var2) < 0) {
+        return -1;
+    }
+
+    i = 0;
+    /* Loop while in bounds of the var1 and var2 */
+    while(i < INTSIZE && (i < var1_len || i < var2_len)) {
+    
+        /* Do initial subtraction */
+        if(i < var2_len) {
+            digit_diff = var1->digits[i] - var2->digits[i] - carry;
+        } else {
+            digit_diff = var1->digits[i] - carry;
+        }
+        if(digit_diff < 0) {
+
+            /* Handle necessary 'borrows' from next digit */
+            digit_diff += 10;
+            carry = 1;
+        } else {
+            carry = 0;
+        }
+        difference.digits[i] = digit_diff;
+        
+        /* Increment `leading_zero_count if the current digit is zero, 
+        resetting if non_zero is found */
+        if(digit_diff == 0) {
+            leading_zero_count++;
+        } else {
+            leading_zero_count = 0;
+        }
+        i++;
+    }
+    difference.length = i - leading_zero_count;
+	if(difference.length == 0) {
+		difference.length = 1;
+	}
+    do_assign(var1, &difference);
+    return 1;
+}
+
+/* Returns an integer that is the result of the integer division 
+   `subset` / `divisor` where `subset` is a slice of a larger longint_t.
+   Modifies `remainder` to be the remainder of the integer division.
+*/
+int
+small_divide(longint_t *subset, longint_t *divisor, longint_t *remainder) {
+	longint_t quotient;
+	int result = 0;
+	quotient = *subset;
+	/* Use iterative subtraction to obtain quotient and remainder */
+	while(do_minus(&quotient, divisor) > 0) {
+		result++;
+	}
+	/* Assign remainder and return result */
+	*remainder = quotient;
+	return result;
+}
+
+/* Update the indicated variable var1 by doing an integer division
+   using var2 to compute var1 = var1 / var2
+*/
+void
+do_divide(longint_t *var1, longint_t *var2) {
+    int i, subset_index, curr_digit = 0, index = var1->length - 1, 
+    selection_width = 1;
+	longint_t subset, result, remainder, remainder_prefix;
+	remainder.length = 1;
+	remainder.digits[0] = 0;
+	/* Initialise result to all zeros */
+	for(i=0;i<INTSIZE;i++) {
+		result.digits[i] = 0;
+	}
+    /* Iterate through var1 backwards */
+    for(i=index; i>=0; i--) {
+		/* Choose the current subset to divide by */
+		subset.length = selection_width;
+		for(subset_index=0; subset_index < selection_width; subset_index++) {
+			subset.digits[subset_index] = var1->digits[i + subset_index];
+		}
+		/* If necessary, add previous remainders */
+		if(remainder.length > 1 || remainder.digits[0] > 0) {
+			do_assign(&remainder_prefix, &remainder);
+			digit_shift(&remainder_prefix, selection_width);
+			do_plus(&subset, &remainder_prefix);
+		}
+		/* If the subset is greater than or equal to the divisor, divide */
+        if(larger_num(&subset, var2) >= 0 && 
+			subset.digits[subset.length - 1] != 0) {
+			curr_digit = small_divide(&subset, var2, &remainder);
+			selection_width = 1;
+		} else {
+			/* If not, increase selection width if the first digits ISNT'T 0 */
+			curr_digit = 0;
+			if(subset.digits[subset.length - 1] != 0 )
+			{
+				selection_width++;
+			}
+		}
+		/* Write division result to the result longint_t */
+		result.digits[i] = curr_digit;
+    }
+	/* Remove leading zeros, modify var1 and return */
+	for(i=INTSIZE-1; i>=0; i--) {
+		if(result.digits[i] != 0) {
+			result.length = i + 1;
+			*var1 = result;
+			return;
+		}
+	}
+}
 
 /*
 Algorithms are fun!!!

@@ -706,7 +706,6 @@ do_minus(longint_t *var1, longint_t *var2) {
         } else {
             digit_diff = var1->digits[i] - carry;
         }
-        
         if(digit_diff < 0) {
 
             /* Handle necessary 'borrows' from next digit */
@@ -759,17 +758,15 @@ void
 do_divide(longint_t *var1, longint_t *var2) {
     int i, subset_index, curr_digit = 0, index = var1->length - 1, 
     selection_width = 1;
-	longint_t subset, result, remainder;
+	longint_t subset, result, remainder, remainder_prefix;
 	remainder.length = 1;
 	remainder.digits[0] = 0;
 	/* Initialise result to all zeros */
 	for(i=0;i<INTSIZE;i++) {
 		result.digits[i] = 0;
 	}
-
     /* Iterate through var1 backwards */
     for(i=index; i>=0; i--) {
-		
 		/* Choose the current subset to divide by */
 		subset.length = selection_width;
 		for(subset_index=0; subset_index < selection_width; subset_index++) {
@@ -777,35 +774,24 @@ do_divide(longint_t *var1, longint_t *var2) {
 		}
 		/* If necessary, add previous remainders */
 		if(remainder.length > 1 || remainder.digits[0] > 0) {
-			printf("\nCurrent selection before: ");
-			print_register_info(&subset);
-			digit_shift(&remainder, selection_width);
-			do_plus(&subset, &remainder);
-			printf("Remainder after: ");
-			print_register_info(&subset);
+			do_assign(&remainder_prefix, &remainder);
+			digit_shift(&remainder_prefix, selection_width);
+			do_plus(&subset, &remainder_prefix);
 		}
 		
 		/* If the subset is greater than or equal to the divisor, divide */
-        if(larger_num(&subset, var2) >= 0 && subset.digits[subset.length - 1] != 0) {
-			/*printf("\n\nDividing:\n");
-			print_register_info(&subset);
-			printf("By\n");
-			print_register_info(var2);*/
+        if(larger_num(&subset, var2) >= 0 && 
+			subset.digits[subset.length - 1] != 0) {
 
 			curr_digit = small_divide(&subset, var2, &remainder);
-			printf("Result: %d   Remainder: ", curr_digit);
-			print_register_info(&remainder);
 			selection_width = 1;
 		} else {
 			/* If not, increase selection width */
 			curr_digit = 0;
 			selection_width++;
 		}
-		
 		/* Write division result to the result longint_t */
 		result.digits[i] = curr_digit;
-		//printf("Writing result (%d) to index %d\n", curr_digit, i);
-		
     }
 	/* Remove leading zeros, modify var1 and return */
 	for(i=INTSIZE-1; i>=0; i--) {
