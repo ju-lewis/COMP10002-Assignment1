@@ -119,7 +119,6 @@ longint_t parse_num(char *rhs);
 
 int max_2_ints(int num1, int num2);
 void do_product(longint_t *var1, longint_t *var2);
-void print_register_info(longint_t *var1);
 void digit_shift(longint_t *var1, int shift_width);
 void do_exponent(longint_t *var1, longint_t *var2);
 int longint_to_integer(longint_t *var);
@@ -528,19 +527,6 @@ max_2_ints(int num1, int num2) {
 	return max_int;
 }
 
-/* This is a debugging function for printing
-   the length and value of a longint_t register
-*/
-void
-print_register_info(longint_t *var1) {
-	int i = 0, var_len = var1->length;
-	printf("Length: %d, Value: ", var_len);
-	for(i=var_len - 1; i>=0; i--) {
-		printf("%d", var1->digits[i]);
-	}
-	printf("\n");
-}
-
 /* Shift a longint_t register over by `shift_width` digits and increment
    the length by one. This is the same effect as multiplying by
    a power of 10, where `shift_width` is the exponent.
@@ -571,7 +557,13 @@ do_product(longint_t *var1, longint_t *var2) {
 
     /* Initialise empty longint_t structs to store intermediate products */
     longint_t curr_total_product, final_product;
-
+    /* Handle multiplying by 0 */
+    if(var1->digits[var1->length - 1] == 0 || 
+        var2->digits[var2->length - 1] == 0) {
+        var1->digits[0] = 0;
+        var1->length = 1;
+        return;
+    }
 	char int_str[MAX_DIGIT_PRODUCT_LEN];
 
 	/* Initialise a zero longint_t */
