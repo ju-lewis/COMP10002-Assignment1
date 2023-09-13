@@ -79,8 +79,8 @@
 #define INT_ZERO 0	/* integer 0 */
 #define INT_TEN  10	/* integer 10 */
 
-#define MAX_DIGIT_PRODUCT_LEN 3
-#define MAX_EXPONENT 1660 /* Any exponent greater than this will overflow */
+#define MAX_DIGIT_PRODUCT_LEN 3 /* The maximum possible length (+1) of the
+                                    product of two 1-digit numbers */
 
 /* Crude fileno fix to allow compilation on Windows */
 #define FILENO_STDIN 0
@@ -116,8 +116,6 @@ void do_assign(longint_t *var1, longint_t *var2);
 void do_plus(longint_t *var1, longint_t *var2);
 void zero_vars(longint_t vars[]);
 longint_t parse_num(char *rhs);
-
-int max_2_ints(int num1, int num2);
 void do_product(longint_t *var1, longint_t *var2);
 void digit_shift(longint_t *var1, int shift_width);
 void do_exponent(longint_t *var1, longint_t *var2);
@@ -126,9 +124,6 @@ int larger_num(longint_t *var1, longint_t *var2);
 int do_minus(longint_t *var1, longint_t *var2);
 int small_divide(longint_t *subset, longint_t *divisor, longint_t *remainder);
 void do_divide(longint_t *var1, longint_t *var2);
-
-
-
 
 /****************************************************************/
 
@@ -519,14 +514,6 @@ prototypes at the top of the program.
 ******************************************************************
 *****************************************************************/
 
-/* Return the largest of 2 input integers
-*/
-int
-max_2_ints(int num1, int num2) {
-	int max_int = (num1 > num2) ?  num1 : num2;
-	return max_int;
-}
-
 /* Shift a longint_t register over by `shift_width` digits and increment
    the length by one. This is the same effect as multiplying by
    a power of 10, where `shift_width` is the exponent.
@@ -626,10 +613,6 @@ do_exponent(longint_t *var1, longint_t *var2) {
 		var1->length = 1;
         return;
 	}
-    if (exponent > MAX_EXPONENT) {
-        print_error("longint_t overflow has occurred.");
-        exit(EXIT_FAILURE);
-    }
     /* END EDGE CASE HANDLING */
 
 	/* Iteratively perform multiplication of var1 to itself */
