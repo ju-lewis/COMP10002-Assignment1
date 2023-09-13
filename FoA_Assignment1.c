@@ -412,6 +412,7 @@ parse_num(char *rhs) {
 
     if(parsed_num.length > INTSIZE) {
         print_error("longint_t overflow has occurred.");
+        exit(EXIT_FAILURE);
     }
 
     return parsed_num;
@@ -497,7 +498,7 @@ do_plus(longint_t *var1, longint_t *var2) {
 
     /* Check for overflows before final assignment */
     if(sum.length > INTSIZE) {
-        print_error("longint_t overflow has occurred. Terminating program.");
+        print_error("longint_t overflow has occurred.");
         exit(EXIT_FAILURE);
     }
 
