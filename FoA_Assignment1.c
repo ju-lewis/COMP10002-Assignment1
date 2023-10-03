@@ -766,7 +766,7 @@ do_divide(longint_t *var1, longint_t *var2) {
 			curr_digit = small_divide(&subset, var2, &remainder);
 			selection_width = 1;
 		} else {
-			/* If not, increase selection width if the first digits ISNT'T 0 */
+			/* If not, increase selection width if the first digits ISN'T 0 */
 			curr_digit = 0;
 			if(subset.digits[subset.length - 1] != 0 )
 			{
