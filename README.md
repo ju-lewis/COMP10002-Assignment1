@@ -1,5 +1,7 @@
-# COMP10002-Assignment1
+# COMP10002 Assignment 1 Submission
 
-The goal of this assignment was to create an arbitrary (well if you consider a #define constant to be arbitrary) precision integer calculator.
+This was my submission for an introduction to C programming class (Foundations of Algorithms), where we had to write a variable-sized integer calculator.
 
-In my submission, I implemented addition, multiplication, exponentiation, and integer (floor) division. The calculator _does_ have the capability to to subtraction, but it wasn't part of the assignment.
+The calculator is capable of addition, subtraction, multiplication, and integer (floor) division.
+
+
